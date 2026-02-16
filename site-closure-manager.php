@@ -9,8 +9,8 @@
  * License: GPL v3 or later
  * Text Domain: site-closure-manager
  * Domain Path: /languages
- * Requires at least: 8.0
- * Requires PHP: 8.3
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
  */
 
 // Sécurité - Empêcher l'accès direct
