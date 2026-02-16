@@ -3,10 +3,10 @@
  * Plugin Name: Site Closure Manager
  * Plugin URI: https://example.com/site-closure-manager
  * Description: Plugin pour fermer temporairement le site WooCommerce à une date précise avec une page de maintenance personnalisée
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Ludovic Stolycia
  * Author URI: https://example.com
- * License: GPL v3 or later
+ * License: GPL v2 or later
  * Text Domain: site-closure-manager
  * Domain Path: /languages
  * Requires at least: 5.8
@@ -214,6 +214,24 @@ class Site_Closure_Manager {
         
         $settings = self::get_settings();
         
+        // Gestion de la prévisualisation
+        if (isset($_GET['scm_preview']) && $_GET['scm_preview'] == '1') {
+            // Vérifier que l'utilisateur a les droits
+            if (current_user_can('manage_options')) {
+                // Vérifier le nonce pour la sécurité (optionnel mais recommandé)
+                if (isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'scm_preview')) {
+                    $this->display_closure_page($settings);
+                    exit;
+                } else {
+                    // Afficher quand même pour la compatibilité avec l'ancien lien
+                    $this->display_closure_page($settings);
+                    exit;
+                }
+            } else {
+                wp_die('Vous n\'avez pas les permissions nécessaires pour prévisualiser cette page.');
+            }
+        }
+        
         // Si la fermeture n'est pas activée
         if (empty($settings['enabled'])) {
             return;
@@ -286,24 +304,28 @@ class Site_Closure_Manager {
      * Afficher la page de fermeture
      */
     private function display_closure_page($settings) {
-        $title = isset($settings['page_title']) ? $settings['page_title'] : 'Site temporairement fermé';
-        $message = isset($settings['page_message']) ? $settings['page_message'] : 'Notre site est actuellement fermé.';
-        $bg_color = isset($settings['background_color']) ? $settings['background_color'] : '#1a1a2e';
-        $text_color = isset($settings['text_color']) ? $settings['text_color'] : '#ffffff';
-        $accent_color = isset($settings['accent_color']) ? $settings['accent_color'] : '#0f3460';
-        $logo_url = isset($settings['logo_url']) ? $settings['logo_url'] : '';
-        $show_countdown = isset($settings['show_countdown']) ? $settings['show_countdown'] : true;
-        $contact_email = isset($settings['contact_email']) ? $settings['contact_email'] : '';
+        // Préparer toutes les variables avec des valeurs par défaut
+        $title = !empty($settings['page_title']) ? $settings['page_title'] : 'Site temporairement fermé';
+        $message = !empty($settings['page_message']) ? $settings['page_message'] : 'Notre site est actuellement fermé.';
+        $bg_color = !empty($settings['background_color']) ? $settings['background_color'] : '#1a1a2e';
+        $text_color = !empty($settings['text_color']) ? $settings['text_color'] : '#ffffff';
+        $accent_color = !empty($settings['accent_color']) ? $settings['accent_color'] : '#0f3460';
+        $logo_url = !empty($settings['logo_url']) ? $settings['logo_url'] : '';
+        $show_countdown = !empty($settings['show_countdown']) ? $settings['show_countdown'] : false;
+        $contact_email = !empty($settings['contact_email']) ? $settings['contact_email'] : '';
         
         // Calculer le temps de réouverture
         $reopen_timestamp = null;
         if (!empty($settings['reopen_date'])) {
-            $reopen_timestamp = strtotime($settings['reopen_date'] . ' ' . $settings['reopen_time']);
+            $reopen_time = !empty($settings['reopen_time']) ? $settings['reopen_time'] : '00:00';
+            $reopen_timestamp = strtotime($settings['reopen_date'] . ' ' . $reopen_time);
         }
         
-        // Définir le header HTTP
-        status_header(503);
-        header('Retry-After: 3600');
+        // Définir le header HTTP (sauf en mode prévisualisation)
+        if (!isset($_GET['scm_preview'])) {
+            status_header(503);
+            header('Retry-After: 3600');
+        }
         
         include SCM_PLUGIN_DIR . 'templates/closure-page.php';
     }
