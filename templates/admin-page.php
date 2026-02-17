@@ -203,14 +203,52 @@ $wp_roles = wp_roles();
                     <h2>Informations de contact</h2>
                     
                     <div class="scm-form-group">
-                        <label for="contact_email">Email de contact</label>
-                        <input type="email" 
-                               name="contact_email" 
-                               id="contact_email" 
-                               class="scm-input"
-                               value="<?php echo esc_attr($settings['contact_email']); ?>">
-                        <span class="description">Affiché pour les questions urgentes</span>
+                        <label for="contact_email">E-mail de destination <span class="required">*</span></label>
+                        <input type="email" name="contact_email" id="contact_email" class="scm-input"
+                               value="<?php echo esc_attr($settings['contact_email']); ?>"
+                               placeholder="contact@monsite.fr">
+                        <span class="description">Adresse qui recevra les messages des visiteurs</span>
                     </div>
+
+                    <div class="scm-form-group">
+                        <label>Mode d'affichage du contact</label>
+                        <div class="scm-radio-group">
+                            <?php
+                            $modes = array(
+                                'none'  => array('label' => 'Masqué',               'desc' => 'Aucune option de contact affichée'),
+                                'email' => array('label' => 'Adresse e-mail seule', 'desc' => 'L\'adresse e-mail est affichée en clair'),
+                                'form'  => array('label' => 'Formulaire seul',      'desc' => 'Un formulaire de contact intégré'),
+                                'both'  => array('label' => 'E-mail + Formulaire',  'desc' => 'Les deux options côte à côte'),
+                            );
+                            $current_mode = !empty($settings['contact_mode']) ? $settings['contact_mode'] : 'email';
+                            foreach ($modes as $val => $opt) : ?>
+                            <label class="scm-radio-label">
+                                <input type="radio" name="contact_mode" value="<?php echo esc_attr($val); ?>"
+                                       <?php checked($current_mode, $val); ?>>
+                                <span class="scm-radio-text">
+                                    <strong><?php echo esc_html($opt['label']); ?></strong>
+                                    <span><?php echo esc_html($opt['desc']); ?></span>
+                                </span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="scm-form-options" style="<?php echo in_array($current_mode, array('form','both')) ? '' : 'display:none;'; ?>">
+                        <div class="scm-form-group">
+                            <label for="form_subject">Sujet de l'e-mail reçu</label>
+                            <input type="text" name="form_subject" id="form_subject" class="scm-input"
+                                   value="<?php echo esc_attr($settings['form_subject']); ?>"
+                                   placeholder="Message depuis la page de maintenance">
+                        </div>
+                        <div class="scm-form-group">
+                            <label for="form_success_message">Message de confirmation affiché au visiteur</label>
+                            <input type="text" name="form_success_message" id="form_success_message" class="scm-input"
+                                   value="<?php echo esc_attr($settings['form_success_message']); ?>"
+                                   placeholder="Merci ! Votre message a bien été envoyé.">
+                        </div>
+                    </div>
+                </div>
                     
                     <div class="scm-form-group">
                         <label>
@@ -294,7 +332,7 @@ $wp_roles = wp_roles();
                         Enregistrer les modifications
                     </button>
                     
-                    <a href="<?php echo esc_url(home_url('?scm_preview=1')); ?>" 
+                    <a href="<?php echo esc_url(add_query_arg(array('scm_preview' => '1', '_wpnonce' => wp_create_nonce('scm_preview')), home_url('/'))); ?>" 
                        class="button button-large" 
                        target="_blank">
                         <span class="dashicons dashicons-visibility"></span>

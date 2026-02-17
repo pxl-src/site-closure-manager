@@ -3,7 +3,7 @@
  * Plugin Name: Site Closure Manager
  * Plugin URI: https://example.com/site-closure-manager
  * Description: Plugin pour fermer temporairement le site WooCommerce à une date précise avec une page de maintenance personnalisée
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Ludovic Stolycia
  * Author URI: https://example.com
  * License: GPL v2 or later
@@ -67,40 +67,50 @@ class Site_Closure_Manager {
         // Vérifier la fermeture du site
         add_action('template_redirect', array($this, 'check_site_closure'), 1);
         
-        // AJAX pour sauvegarder les paramètres
+        // AJAX pour sauvegarder les paramètres (admin)
         add_action('wp_ajax_scm_save_settings', array($this, 'ajax_save_settings'));
+        
+        // AJAX pour le formulaire de contact (public, connecté ou non)
+        add_action('wp_ajax_scm_send_contact',        array($this, 'ajax_send_contact'));
+        add_action('wp_ajax_nopriv_scm_send_contact', array($this, 'ajax_send_contact'));
     }
     
+    /**
+     * Tableau des options par défaut
+     */
+    private static function default_options() {
+        return array(
+            'enabled'              => false,
+            'closure_date'         => '',
+            'closure_time'         => '00:00',
+            'reopen_date'          => '',
+            'reopen_time'          => '00:00',
+            'page_title'           => 'Site temporairement fermé',
+            'page_message'         => 'Notre site est actuellement fermé pour maintenance. Nous serons de retour bientôt.',
+            'show_countdown'       => true,
+            'background_color'     => '#1a1a2e',
+            'text_color'           => '#ffffff',
+            'accent_color'         => '#0f3460',
+            'logo_url'             => '',
+            'contact_email'        => get_option('admin_email', ''),
+            'contact_mode'         => 'email',
+            'form_subject'         => 'Message depuis la page de maintenance',
+            'form_success_message' => 'Merci ! Votre message a bien été envoyé.',
+            'bypass_roles'         => array('administrator'),
+            'show_social'          => false,
+            'facebook_url'         => '',
+            'twitter_url'          => '',
+            'instagram_url'        => '',
+            'linkedin_url'         => '',
+        );
+    }
+
     /**
      * Activation du plugin
      */
     public function activate() {
-        // Définir les options par défaut
-        $default_options = array(
-            'enabled' => false,
-            'closure_date' => '',
-            'closure_time' => '00:00',
-            'reopen_date' => '',
-            'reopen_time' => '00:00',
-            'page_title' => 'Site temporairement fermé',
-            'page_message' => 'Notre site est actuellement fermé pour maintenance. Nous serons de retour bientôt.',
-            'show_countdown' => true,
-            'background_color' => '#1a1a2e',
-            'text_color' => '#ffffff',
-            'accent_color' => '#0f3460',
-            'logo_url' => '',
-            'contact_email' => get_option('admin_email'),
-            'bypass_roles' => array('administrator'),
-            'show_social' => false,
-            'facebook_url' => '',
-            'twitter_url' => '',
-            'instagram_url' => '',
-            'linkedin_url' => ''
-        );
-        
-        // Utiliser add_option qui n'écrase pas si l'option existe déjà
         if (!get_option('scm_settings')) {
-            add_option('scm_settings', $default_options);
+            add_option('scm_settings', self::default_options());
         }
     }
     
@@ -108,32 +118,8 @@ class Site_Closure_Manager {
      * Obtenir les paramètres avec valeurs par défaut
      */
     public static function get_settings() {
-        $default_options = array(
-            'enabled' => false,
-            'closure_date' => '',
-            'closure_time' => '00:00',
-            'reopen_date' => '',
-            'reopen_time' => '00:00',
-            'page_title' => 'Site temporairement fermé',
-            'page_message' => 'Notre site est actuellement fermé pour maintenance. Nous serons de retour bientôt.',
-            'show_countdown' => true,
-            'background_color' => '#1a1a2e',
-            'text_color' => '#ffffff',
-            'accent_color' => '#0f3460',
-            'logo_url' => '',
-            'contact_email' => get_option('admin_email', ''),
-            'bypass_roles' => array('administrator'),
-            'show_social' => false,
-            'facebook_url' => '',
-            'twitter_url' => '',
-            'instagram_url' => '',
-            'linkedin_url' => ''
-        );
-        
         $settings = get_option('scm_settings', array());
-        
-        // Fusionner avec les valeurs par défaut pour éviter les clés manquantes
-        return wp_parse_args($settings, $default_options);
+        return wp_parse_args($settings, self::default_options());
     }
     
     /**
@@ -348,37 +334,90 @@ class Site_Closure_Manager {
         }
         
         $settings = array(
-            'enabled' => isset($_POST['enabled']) && $_POST['enabled'] === 'true',
-            'closure_date' => sanitize_text_field($_POST['closure_date']),
-            'closure_time' => sanitize_text_field($_POST['closure_time']),
-            'reopen_date' => sanitize_text_field($_POST['reopen_date']),
-            'reopen_time' => sanitize_text_field($_POST['reopen_time']),
-            'page_title' => sanitize_text_field($_POST['page_title']),
-            'page_message' => wp_kses_post($_POST['page_message']),
-            'show_countdown' => isset($_POST['show_countdown']) && $_POST['show_countdown'] === 'true',
-            'background_color' => sanitize_hex_color($_POST['background_color']),
-            'text_color' => sanitize_hex_color($_POST['text_color']),
-            'accent_color' => sanitize_hex_color($_POST['accent_color']),
-            'logo_url' => esc_url_raw($_POST['logo_url']),
-            'contact_email' => sanitize_email($_POST['contact_email']),
-            'bypass_roles' => isset($_POST['bypass_roles']) ? array_map('sanitize_text_field', $_POST['bypass_roles']) : array(),
-            'show_social' => isset($_POST['show_social']) && $_POST['show_social'] === 'true',
-            'facebook_url' => esc_url_raw($_POST['facebook_url']),
-            'twitter_url' => esc_url_raw($_POST['twitter_url']),
-            'instagram_url' => esc_url_raw($_POST['instagram_url']),
-            'linkedin_url' => esc_url_raw($_POST['linkedin_url'])
+            'enabled'              => isset($_POST['enabled']) && $_POST['enabled'] === 'true',
+            'closure_date'         => sanitize_text_field($_POST['closure_date']),
+            'closure_time'         => sanitize_text_field($_POST['closure_time']),
+            'reopen_date'          => sanitize_text_field($_POST['reopen_date']),
+            'reopen_time'          => sanitize_text_field($_POST['reopen_time']),
+            'page_title'           => sanitize_text_field($_POST['page_title']),
+            'page_message'         => wp_kses_post($_POST['page_message']),
+            'show_countdown'       => isset($_POST['show_countdown']) && $_POST['show_countdown'] === 'true',
+            'background_color'     => sanitize_hex_color($_POST['background_color']),
+            'text_color'           => sanitize_hex_color($_POST['text_color']),
+            'accent_color'         => sanitize_hex_color($_POST['accent_color']),
+            'logo_url'             => esc_url_raw($_POST['logo_url']),
+            'contact_email'        => sanitize_email($_POST['contact_email']),
+            'contact_mode'         => sanitize_text_field($_POST['contact_mode']),
+            'form_subject'         => sanitize_text_field($_POST['form_subject']),
+            'form_success_message' => sanitize_text_field($_POST['form_success_message']),
+            'bypass_roles'         => isset($_POST['bypass_roles']) ? array_map('sanitize_text_field', $_POST['bypass_roles']) : array(),
+            'show_social'          => isset($_POST['show_social']) && $_POST['show_social'] === 'true',
+            'facebook_url'         => esc_url_raw($_POST['facebook_url']),
+            'twitter_url'          => esc_url_raw($_POST['twitter_url']),
+            'instagram_url'        => esc_url_raw($_POST['instagram_url']),
+            'linkedin_url'         => esc_url_raw($_POST['linkedin_url']),
         );
         
         update_option('scm_settings', $settings);
-        
         wp_send_json_success('Paramètres sauvegardés avec succès');
     }
-}
 
+    /**
+     * Handler AJAX pour le formulaire de contact public
+     */
+    public function ajax_send_contact() {
+        // Vérifier le nonce
+        if (!isset($_POST['scm_contact_nonce']) || !wp_verify_nonce($_POST['scm_contact_nonce'], 'scm_contact_form')) {
+            wp_send_json_error('Requête invalide.');
+        }
+
+        $settings     = self::get_settings();
+        $to           = sanitize_email($settings['contact_email']);
+        $from_name    = sanitize_text_field($_POST['scm_name']  ?? '');
+        $from_email   = sanitize_email($_POST['scm_email']      ?? '');
+        $from_message = sanitize_textarea_field($_POST['scm_message'] ?? '');
+        $subject      = !empty($settings['form_subject']) ? $settings['form_subject'] : 'Message depuis la page de maintenance';
+
+        // Validations basiques
+        if (empty($from_name) || empty($from_email) || empty($from_message)) {
+            wp_send_json_error('Veuillez remplir tous les champs.');
+        }
+        if (!is_email($from_email)) {
+            wp_send_json_error('Adresse e-mail invalide.');
+        }
+        if (empty($to)) {
+            wp_send_json_error('Adresse de destination non configurée.');
+        }
+
+        $body = sprintf(
+            "Vous avez reçu un message depuis la page de maintenance.\n\nNom : %s\nE-mail : %s\n\nMessage :\n%s",
+            $from_name,
+            $from_email,
+            $from_message
+        );
+
+        $headers = array(
+            'Content-Type: text/plain; charset=UTF-8',
+            sprintf('Reply-To: %s <%s>', $from_name, $from_email),
+        );
+
+        $sent = wp_mail($to, $subject, $body, $headers);
+
+        if ($sent) {
+            $success_msg = !empty($settings['form_success_message'])
+                ? $settings['form_success_message']
+                : 'Merci ! Votre message a bien été envoyé.';
+            wp_send_json_success($success_msg);
+        } else {
+            wp_send_json_error('Une erreur est survenue lors de l\'envoi. Veuillez réessayer.');
+        }
+    }
+}
 // Initialiser le plugin
 function scm_init() {
     return Site_Closure_Manager::get_instance();
 }
+
 
 // Démarrer le plugin
 add_action('plugins_loaded', 'scm_init');

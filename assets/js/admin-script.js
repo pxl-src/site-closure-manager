@@ -13,6 +13,16 @@ jQuery(document).ready(function($) {
         }
     });
     
+    // Toggle des options de formulaire selon le mode contact
+    $('input[name="contact_mode"]').on('change', function() {
+        var val = $(this).val();
+        if (val === 'form' || val === 'both') {
+            $('#scm-form-options').slideDown();
+        } else {
+            $('#scm-form-options').slideUp();
+        }
+    });
+    
     // Upload de logo
     var mediaUploader;
     
@@ -160,6 +170,9 @@ jQuery(document).ready(function($) {
             accent_color: $('#accent_color').val(),
             logo_url: $('#logo_url').val(),
             contact_email: $('#contact_email').val(),
+            contact_mode: $('input[name="contact_mode"]:checked').val() || 'email',
+            form_subject: $('#form_subject').val(),
+            form_success_message: $('#form_success_message').val(),
             bypass_roles: bypassRoles,
             show_social: $('#show_social').is(':checked'),
             facebook_url: $('#facebook_url').val(),
