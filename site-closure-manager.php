@@ -3,7 +3,7 @@
  * Plugin Name: Site Closure Manager
  * Plugin URI: https://example.com/site-closure-manager
  * Description: Plugin pour fermer temporairement le site WooCommerce à une date précise avec une page de maintenance personnalisée
- * Version: 1.0.2
+ * Version: 1.0.4
  * Author: Ludovic Stolycia
  * Author URI: https://example.com
  * License: GPL v2 or later
