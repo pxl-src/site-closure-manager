@@ -3,7 +3,7 @@
  * Plugin Name: Site Closure Manager
  * Plugin URI: https://example.com/site-closure-manager
  * Description: Plugin pour fermer temporairement le site WooCommerce à une date précise avec une page de maintenance personnalisée
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: Ludovic Stolycia
  * Author URI: https://example.com
  * License: GPL v2 or later
@@ -73,6 +73,10 @@ class Site_Closure_Manager {
         // AJAX pour le formulaire de contact (public, connecté ou non)
         add_action('wp_ajax_scm_send_contact',        array($this, 'ajax_send_contact'));
         add_action('wp_ajax_nopriv_scm_send_contact', array($this, 'ajax_send_contact'));
+        
+        // AJAX pour générer le captcha
+        add_action('wp_ajax_scm_generate_captcha',        array($this, 'ajax_generate_captcha'));
+        add_action('wp_ajax_nopriv_scm_generate_captcha', array($this, 'ajax_generate_captcha'));
     }
     
     /**
@@ -371,6 +375,19 @@ class Site_Closure_Manager {
             wp_send_json_error('Requête invalide.');
         }
 
+        // Vérifier le captcha
+        $captcha_answer = isset($_POST['scm_captcha']) ? trim($_POST['scm_captcha']) : '';
+        $captcha_hash   = isset($_POST['scm_captcha_hash']) ? trim($_POST['scm_captcha_hash']) : '';
+        
+        if (empty($captcha_answer) || empty($captcha_hash)) {
+            wp_send_json_error('Veuillez résoudre le calcul de sécurité.');
+        }
+        
+        // Vérifier la validité du captcha (hash + réponse)
+        if (!$this->verify_captcha($captcha_answer, $captcha_hash)) {
+            wp_send_json_error('Calcul de sécurité incorrect. Veuillez réessayer.');
+        }
+
         $settings     = self::get_settings();
         $to           = sanitize_email($settings['contact_email']);
         $from_name    = sanitize_text_field($_POST['scm_name']  ?? '');
@@ -412,12 +429,40 @@ class Site_Closure_Manager {
             wp_send_json_error('Une erreur est survenue lors de l\'envoi. Veuillez réessayer.');
         }
     }
-}
+
+    /**
+     * Générer un captcha mathématique simple
+     */
+    public function ajax_generate_captcha() {
+        $num1 = rand(1, 10);
+        $num2 = rand(1, 10);
+        $answer = $num1 + $num2;
+        
+        // Créer un hash unique basé sur la réponse et un salt
+        $salt = wp_salt('nonce');
+        $hash = hash_hmac('sha256', (string)$answer, $salt);
+        
+        wp_send_json_success(array(
+            'question' => "{$num1} + {$num2} = ?",
+            'hash'     => $hash,
+        ));
+    }
+    
+    /**
+     * Vérifier la réponse du captcha
+     */
+    private function verify_captcha($answer, $hash) {
+        $salt = wp_salt('nonce');
+        $expected_hash = hash_hmac('sha256', (string)$answer, $salt);
+        return hash_equals($expected_hash, $hash);
+    }
+
+} // Fin de la classe Site_Closure_Manager
+
 // Initialiser le plugin
 function scm_init() {
     return Site_Closure_Manager::get_instance();
 }
-
 
 // Démarrer le plugin
 add_action('plugins_loaded', 'scm_init');

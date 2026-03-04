@@ -32,22 +32,17 @@
         }
         h1 { font-size:2.4em;font-weight:700;line-height:1.2;margin-bottom:18px; }
         .message { font-size:1.1em;line-height:1.7;opacity:.9;margin-bottom:36px; }
-
-        /* Countdown */
         .countdown-wrapper { background:rgba(255,255,255,.1);border-radius:14px;padding:28px 20px;margin-bottom:32px;backdrop-filter:blur(10px); }
         .countdown-title { font-size:.85em;text-transform:uppercase;letter-spacing:2px;opacity:.75;margin-bottom:18px; }
         .countdown { display:flex;justify-content:center;gap:16px;flex-wrap:wrap; }
         .countdown-item { background:rgba(255,255,255,.15);border-radius:10px;padding:18px 14px;min-width:76px; }
         .countdown-value { font-size:2.4em;font-weight:700;display:block;line-height:1; }
         .countdown-label { font-size:.75em;text-transform:uppercase;margin-top:8px;opacity:.75;letter-spacing:1px; }
-
-        /* Contact */
         .contact-section { margin-top:36px;padding-top:36px;border-top:1px solid rgba(255,255,255,.2); }
         .contact-section h2 { font-size:1.15em;margin-bottom:20px;opacity:.9; }
         .contact-email-display { font-size:1em;opacity:.85;margin-bottom:8px; }
         .contact-email-display a { color:<?php echo esc_attr($text_color); ?>;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.5);transition:border-color .2s; }
         .contact-email-display a:hover { border-bottom-color:<?php echo esc_attr($text_color); ?>; }
-
         .contact-form { text-align:left;background:rgba(255,255,255,.1);border-radius:14px;padding:28px;backdrop-filter:blur(8px); }
         .form-row { margin-bottom:16px; }
         .form-row label { display:block;font-size:.85em;font-weight:600;text-transform:uppercase;letter-spacing:.8px;opacity:.8;margin-bottom:6px; }
@@ -75,13 +70,10 @@
         .form-feedback.error   { background:rgba(220,50,50,.25);border:1px solid rgba(220,50,50,.5); }
         .contact-separator { display:flex;align-items:center;gap:14px;margin:20px 0;opacity:.6;font-size:.85em; }
         .contact-separator::before,.contact-separator::after { content:'';flex:1;border-top:1px solid rgba(255,255,255,.4); }
-
-        /* Social */
         .social-links { display:flex;justify-content:center;gap:16px;margin-top:28px; }
         .social-links a { width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border-radius:50%;transition:background .2s,transform .2s;text-decoration:none; }
         .social-links a:hover { background:rgba(255,255,255,.25);transform:translateY(-3px); }
         .social-links svg { width:20px;height:20px;fill:<?php echo esc_attr($text_color); ?>; }
-
         @media(max-width:520px){
             h1{font-size:1.8em}
             .form-grid{grid-template-columns:1fr;gap:0}
@@ -92,7 +84,6 @@
 </head>
 <body>
 <div class="closure-container">
-
     <?php if (!empty($logo_url)) : ?>
         <div class="logo"><img src="<?php echo esc_url($logo_url); ?>" alt="Logo"></div>
     <?php else : ?>
@@ -119,9 +110,21 @@
     <script>
     (function(){
         var target = <?php echo (int) $reopen_timestamp * 1000; ?>;
+        var isPreview = <?php echo isset($_GET['scm_preview']) ? 'true' : 'false'; ?>;
         function tick(){
             var d=target-Date.now();
-            if(d<0){location.reload();return;}
+            if(d<0){
+                // Ne pas recharger en mode prévisualisation
+                if(!isPreview){
+                    location.reload();
+                }
+                // Afficher que la date est dépassée
+                document.getElementById('days').textContent = 0;
+                document.getElementById('hours').textContent = '00';
+                document.getElementById('minutes').textContent = '00';
+                document.getElementById('seconds').textContent = '00';
+                return;
+            }
             document.getElementById('days').textContent    = Math.floor(d/86400000);
             document.getElementById('hours').textContent   = String(Math.floor(d%86400000/3600000)).padStart(2,'0');
             document.getElementById('minutes').textContent = String(Math.floor(d%3600000/60000)).padStart(2,'0');
@@ -169,51 +172,121 @@
                 <label for="scm_message">Votre message</label>
                 <textarea id="scm_message" placeholder="Comment pouvons-nous vous aider ?" maxlength="2000"></textarea>
             </div>
+            <div class="form-row">
+                <label for="scm_captcha">Sécurité : Résolvez ce calcul</label>
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <canvas id="scm-captcha-canvas" width="140" height="50" style="border: 1px solid rgba(255,255,255,.3); border-radius: 6px; background: rgba(255,255,255,.08); cursor: pointer;" title="Cliquer pour recharger"></canvas>
+                    <input type="text" id="scm_captcha" placeholder="?" maxlength="3" style="width: 70px; text-align: center; font-size: 1.1em; font-weight: 600;">
+                    <input type="hidden" id="scm_captcha_hash">
+                </div>
+                <span style="font-size: .8em; margin-top: 4px; opacity: .7; display: block;">Cliquez sur l'image pour recharger</span>
+            </div>
             <button class="btn-submit" id="scm-submit-btn">Envoyer le message</button>
             <div class="form-feedback" id="scm-form-feedback"></div>
         </div>
         <script>
         (function(){
+            var captchaHash='';
+            function loadCaptcha(){
+                fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>?action=scm_generate_captcha')
+                .then(function(r){return r.json();})
+                .then(function(res){
+                    if(res.success&&res.data){
+                        captchaHash=res.data.hash;
+                        document.getElementById('scm_captcha_hash').value=captchaHash;
+                        drawCaptcha(res.data.question);
+                    }
+                })
+                .catch(function(){console.error('Erreur captcha');});
+            }
+            function drawCaptcha(text){
+                var canvas=document.getElementById('scm-captcha-canvas');
+                if(!canvas)return;
+                var ctx=canvas.getContext('2d');
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                for(var i=0;i<50;i++){
+                    ctx.fillStyle='rgba(255,255,255,'+(Math.random()*0.15)+')';
+                    ctx.fillRect(Math.random()*canvas.width,Math.random()*canvas.height,2,2);
+                }
+                ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;
+                for(var j=0;j<3;j++){
+                    ctx.beginPath();
+                    ctx.moveTo(Math.random()*canvas.width,Math.random()*canvas.height);
+                    ctx.lineTo(Math.random()*canvas.width,Math.random()*canvas.height);
+                    ctx.stroke();
+                }
+                ctx.font='bold 24px Arial';ctx.textBaseline='middle';
+                var x=15;
+                for(var k=0;k<text.length;k++){
+                    ctx.save();
+                    ctx.translate(x,25);
+                    ctx.rotate((Math.random()-0.5)*0.3);
+                    ctx.fillStyle='rgba(255,255,255,'+(0.8+Math.random()*0.2)+')';
+                    ctx.fillText(text[k],0,0);
+                    ctx.restore();
+                    x+=ctx.measureText(text[k]).width+4;
+                }
+            }
+            var canvas=document.getElementById('scm-captcha-canvas');
+            if(canvas){
+                canvas.addEventListener('click',function(){
+                    document.getElementById('scm_captcha').value='';
+                    loadCaptcha();
+                });
+            }
+            loadCaptcha();
             document.getElementById('scm-submit-btn').addEventListener('click',function(){
                 var btn=this,fb=document.getElementById('scm-form-feedback');
                 var name=document.getElementById('scm_name').value.trim();
                 var email=document.getElementById('scm_email').value.trim();
                 var msg=document.getElementById('scm_message').value.trim();
-                fb.style.display='none'; fb.className='form-feedback';
+                var captcha=document.getElementById('scm_captcha').value.trim();
+                var hash=document.getElementById('scm_captcha_hash').value;
+                fb.style.display='none';fb.className='form-feedback';
                 if(!name||!email||!msg){
                     fb.textContent='Veuillez remplir tous les champs.';
-                    fb.classList.add('error'); fb.style.display='block'; return;
+                    fb.classList.add('error');fb.style.display='block';return;
                 }
                 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
                     fb.textContent='Adresse e-mail invalide.';
-                    fb.classList.add('error'); fb.style.display='block'; return;
+                    fb.classList.add('error');fb.style.display='block';return;
                 }
-                btn.disabled=true; btn.textContent='Envoi en cours\u2026';
+                if(!captcha){
+                    fb.textContent='Veuillez résoudre le calcul de sécurité.';
+                    fb.classList.add('error');fb.style.display='block';return;
+                }
+                btn.disabled=true;btn.textContent='Envoi en cours…';
                 var data=new URLSearchParams();
                 data.append('action','scm_send_contact');
                 data.append('scm_contact_nonce','<?php echo wp_create_nonce('scm_contact_form'); ?>');
                 data.append('scm_name',name);
                 data.append('scm_email',email);
                 data.append('scm_message',msg);
+                data.append('scm_captcha',captcha);
+                data.append('scm_captcha_hash',hash);
                 fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>',{method:'POST',body:data})
                 .then(function(r){return r.json();})
                 .then(function(res){
                     if(res.success){
-                        fb.textContent=res.data; fb.classList.add('success'); fb.style.display='block';
+                        fb.textContent=res.data;fb.classList.add('success');fb.style.display='block';
                         document.getElementById('scm_name').value='';
                         document.getElementById('scm_email').value='';
                         document.getElementById('scm_message').value='';
-                        btn.textContent='Message envoy\u00e9 \u2713';
-                    } else {
+                        document.getElementById('scm_captcha').value='';
+                        btn.textContent='Message envoyé ✓';
+                        loadCaptcha();
+                    }else{
                         fb.textContent=res.data||'Une erreur est survenue.';
-                        fb.classList.add('error'); fb.style.display='block';
-                        btn.disabled=false; btn.textContent='Envoyer le message';
+                        fb.classList.add('error');fb.style.display='block';
+                        btn.disabled=false;btn.textContent='Envoyer le message';
+                        document.getElementById('scm_captcha').value='';
+                        loadCaptcha();
                     }
                 })
                 .catch(function(){
-                    fb.textContent='Erreur r\u00e9seau. Veuillez r\u00e9essayer.';
-                    fb.classList.add('error'); fb.style.display='block';
-                    btn.disabled=false; btn.textContent='Envoyer le message';
+                    fb.textContent='Erreur réseau. Veuillez réessayer.';
+                    fb.classList.add('error');fb.style.display='block';
+                    btn.disabled=false;btn.textContent='Envoyer le message';
                 });
             });
         })();
@@ -230,7 +303,7 @@
         </a>
         <?php endif; ?>
         <?php if (!empty($settings['twitter_url'])) : ?>
-        <a href="<?php echo esc_url($settings['twitter_url']); ?>" target="_blank" rel="noopener" aria-label="Twitter/X">
+        <a href="<?php echo esc_url($settings['twitter_url']); ?>" target="_blank" rel="noopener" aria-label="Twitter">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.633 7.997c.013.175.013.349.013.523 0 5.325-4.053 11.461-11.46 11.461-2.282 0-4.402-.661-6.186-1.809.324.037.636.05.973.05a8.07 8.07 0 0 0 5.001-1.721 4.036 4.036 0 0 1-3.767-2.793c.249.037.499.062.761.062.361 0 .724-.05 1.061-.137a4.027 4.027 0 0 1-3.23-3.953v-.05c.537.299 1.16.486 1.82.511a4.022 4.022 0 0 1-1.796-3.354c0-.748.199-1.434.548-2.032a11.457 11.457 0 0 0 8.306 4.215c-.062-.3-.1-.611-.1-.923a4.026 4.026 0 0 1 4.028-4.028c1.16 0 2.207.486 2.943 1.272a7.957 7.957 0 0 0 2.556-.973 4.02 4.02 0 0 1-1.771 2.22 8.073 8.073 0 0 0 2.319-.624 8.645 8.645 0 0 1-2.019 2.083z"/></svg>
         </a>
         <?php endif; ?>
